@@ -4,6 +4,9 @@ namespace hybridclr
 {
 namespace transform
 {
+	uint16_t g_trans_il_offset = 0;
+	uint16_t g_exec_il_offset = 0;
+
 	EvalStackReduceDataType GetEvalStackReduceDataType(const Il2CppType* type)
 	{
 		if (type->byref)

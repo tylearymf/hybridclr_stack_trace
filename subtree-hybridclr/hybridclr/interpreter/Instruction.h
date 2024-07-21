@@ -18,6 +18,7 @@ namespace interpreter
 		Volatile = 0x20,
 	};
 
+	extern uint16_t g_il_offset_size;
 	extern uint16_t g_instructionSizes[];
 
 	enum class HiOpcodeEnum : uint16_t
@@ -856,6 +857,7 @@ namespace interpreter
 	struct IRCommon
 	{
 		HiOpcodeEnum type;
+		uint16_t il_offset;
 	};
 
 #pragma region instruction

@@ -21,6 +21,9 @@ namespace transform
 	using namespace hybridclr::metadata;
 	using namespace hybridclr::interpreter;
 
+	extern uint16_t g_trans_il_offset;
+	extern uint16_t g_exec_il_offset;
+
 	struct IRBasicBlock
 	{
 		bool visited;
@@ -69,9 +72,17 @@ namespace transform
 	constexpr EvalStackReduceDataType NATIVE_INT_REDUCE_TYPE = EvalStackReduceDataType::I4;
 #endif
 
-#define CreateIR(varName, typeName) IR##typeName* varName = pool.AllocIR<IR##typeName>(); varName->type = HiOpcodeEnum::typeName;
-#define CreateAddIR(varName, typeName) IR##typeName* varName = pool.AllocIR<IR##typeName>(); varName->type = HiOpcodeEnum::typeName; curbb->insts.push_back(varName);
+#define CreateIR(varName, typeName)\
+	IR##typeName* varName = pool.AllocIR<IR##typeName>();\
+	varName->type = HiOpcodeEnum::typeName;\
+	varName->il_offset = g_trans_il_offset;
 
+#define CreateAddIR(varName, typeName)\
+	IR##typeName* varName = pool.AllocIR<IR##typeName>();\
+	varName->type = HiOpcodeEnum::typeName;\
+	curbb->insts.push_back(varName);\
+	varName->il_offset = g_trans_il_offset;
+	
 	enum class LocationDescType
 	{
 		I1,

@@ -4,6 +4,8 @@ namespace hybridclr
 {
 namespace interpreter
 {
+	uint16_t g_il_offset_size = 2;
+
     uint16_t g_instructionSizes[] =
     {
 		0,

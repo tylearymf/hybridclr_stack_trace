@@ -366,9 +366,9 @@ namespace interpreter
 			}
 		}
 
-		InterpFrame* EnterFrameFromInterpreter(const MethodInfo* method, StackObject* argBase);
+		InterpFrame* EnterFrameFromInterpreter(const MethodInfo* method, StackObject* argBase, uint16_t il_offset);
 
-		InterpFrame* EnterFrameFromNative(const MethodInfo* method, StackObject* argBase);
+		InterpFrame* EnterFrameFromNative(const MethodInfo* method, StackObject* argBase, uint16_t il_offset);
 
 		InterpFrame* LeaveFrame();
 

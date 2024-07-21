@@ -424,6 +424,9 @@ else \
 				}
 			}
 
+			uint16_t il_offset = (uint16_t)(ip - ipBase);
+			hybridclr::transform::g_trans_il_offset = il_offset;
+
 			switch ((OpcodeValue)*ip)
 			{
 			case OpcodeValue::NOP:
@@ -3545,7 +3548,7 @@ ir->ele = ele.locOffset;
 			bb->codeOffset = totalSize;
 			for (IRCommon* ir : bb->insts)
 			{
-				totalSize += g_instructionSizes[(int)ir->type];
+				totalSize += g_instructionSizes[(int)ir->type] + g_il_offset_size;
 			}
 		}
 		endBb.codeOffset = totalSize;
@@ -3577,7 +3580,7 @@ ir->ele = ele.locOffset;
 			bb->codeOffset = tranOffset;
 			for (IRCommon* ir : bb->insts)
 			{
-				uint32_t irSize = g_instructionSizes[(int)ir->type];
+				uint32_t irSize = g_instructionSizes[(int)ir->type] + g_il_offset_size;
 				std::memcpy(tranCodes + tranOffset, &ir->type, irSize);
 				tranOffset += irSize;
 			}

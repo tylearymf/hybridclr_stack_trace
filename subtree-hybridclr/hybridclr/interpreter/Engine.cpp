@@ -5,11 +5,13 @@
 #include "Interpreter.h"
 #include "MemoryUtil.h"
 
+#include "../debug//StackTrace.h"
+
 namespace hybridclr
 {
 namespace interpreter
 {
-	InterpFrame* InterpFrameGroup::EnterFrameFromInterpreter(const MethodInfo* method, StackObject* argBase)
+	InterpFrame* InterpFrameGroup::EnterFrameFromInterpreter(const MethodInfo* method, StackObject* argBase, uint16_t il_offset)
 	{
 #if IL2CPP_ENABLE_PROFILER
 		il2cpp_codegen_profiler_method_enter(method);
@@ -20,11 +22,12 @@ namespace interpreter
 		InterpFrame* newFrame = _machineState.PushFrame();
 		*newFrame = { method, argBase, oldStackTop, nullptr, nullptr, nullptr, 0, 0, _machineState.GetLocalPoolBottomIdx() };
 		PUSH_STACK_FRAME(method);
+		PUSH_NEW_STACK_FRAME(method, il_offset);
 		return newFrame;
 	}
 
 
-	InterpFrame* InterpFrameGroup::EnterFrameFromNative(const MethodInfo* method, StackObject* argBase)
+	InterpFrame* InterpFrameGroup::EnterFrameFromNative(const MethodInfo* method, StackObject* argBase, uint16_t il_offset)
 	{
 #if IL2CPP_ENABLE_PROFILER
 		il2cpp_codegen_profiler_method_enter(method);
@@ -42,6 +45,7 @@ namespace interpreter
 			CopyStackObject(stackBasePtr, argBase, imi->argStackObjectSize);
 		}
 		PUSH_STACK_FRAME(method);
+		PUSH_NEW_STACK_FRAME(method, il_offset);
 		return newFrame;
 	}
 
@@ -49,6 +53,7 @@ namespace interpreter
 	{
 		IL2CPP_ASSERT(_machineState.GetFrameTopIdx() > _frameBaseIdx);
 		POP_STACK_FRAME();
+		POP_NEW_STACK_FRAME();
 		InterpFrame* frame = _machineState.GetTopFrame();
 #if IL2CPP_ENABLE_PROFILER
 		il2cpp_codegen_profiler_method_exit(frame->method);

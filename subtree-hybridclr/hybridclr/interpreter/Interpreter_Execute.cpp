@@ -30,6 +30,11 @@
 #include "InterpreterUtil.h"
 #include "gc/WriteBarrier.h"
 
+#include "../transform/TransformContext.h"
+#include "../debug/StackTrace.h"
+#include "../debug/UnityBridge.h"
+#include <string>
+
 using namespace hybridclr::metadata;
 
 namespace hybridclr
@@ -1262,17 +1267,17 @@ namespace interpreter
 }
 
 	// maxStackSize包含 arg + local + eval,对于解释器栈来说，可能多余
-#define PREPARE_NEW_FRAME_FROM_NATIVE(newMethodInfo, argBasePtr, retPtr) { \
+#define PREPARE_NEW_FRAME_FROM_NATIVE(newMethodInfo, argBasePtr, retPtr, il_offset) { \
 	imi = newMethodInfo->interpData ? (InterpMethodInfo*)newMethodInfo->interpData : InterpreterModule::GetInterpMethodInfo(newMethodInfo); \
-	frame = interpFrameGroup.EnterFrameFromNative(newMethodInfo, argBasePtr); \
+	frame = interpFrameGroup.EnterFrameFromNative(newMethodInfo, argBasePtr, il_offset); \
 	frame->ret = retPtr; \
 	ip = ipBase = imi->codes; \
 	localVarBase = frame->stackBasePtr; \
 }
 
-#define PREPARE_NEW_FRAME_FROM_INTERPRETER(newMethodInfo, argBasePtr, retPtr) { \
+#define PREPARE_NEW_FRAME_FROM_INTERPRETER(newMethodInfo, argBasePtr, retPtr, il_offset) { \
 	imi = newMethodInfo->interpData ? (InterpMethodInfo*)newMethodInfo->interpData : InterpreterModule::GetInterpMethodInfo(newMethodInfo); \
-	frame = interpFrameGroup.EnterFrameFromInterpreter(newMethodInfo, argBasePtr); \
+	frame = interpFrameGroup.EnterFrameFromInterpreter(newMethodInfo, argBasePtr, il_offset); \
 	frame->ret = retPtr; \
 	ip = ipBase = imi->codes; \
 	localVarBase = frame->stackBasePtr; \
@@ -1305,14 +1310,14 @@ namespace interpreter
 	} \
 }
 
-#define CALL_INTERP_VOID(nextIp, methodInfo, argBasePtr) { \
+#define CALL_INTERP_VOID(nextIp, methodInfo, argBasePtr, il_offset) { \
 	SAVE_CUR_FRAME(nextIp) \
-	PREPARE_NEW_FRAME_FROM_INTERPRETER(methodInfo, argBasePtr, nullptr); \
+	PREPARE_NEW_FRAME_FROM_INTERPRETER(methodInfo, argBasePtr, nullptr, il_offset); \
 }
 
-#define CALL_INTERP_RET(nextIp, methodInfo, argBasePtr, retPtr) { \
+#define CALL_INTERP_RET(nextIp, methodInfo, argBasePtr, retPtr, il_offset) { \
 	SAVE_CUR_FRAME(nextIp) \
-	PREPARE_NEW_FRAME_FROM_INTERPRETER(methodInfo, argBasePtr, retPtr); \
+	PREPARE_NEW_FRAME_FROM_INTERPRETER(methodInfo, argBasePtr, retPtr, il_offset); \
 }
 
 #pragma endregion
@@ -1662,14 +1667,20 @@ else \
 
 		Il2CppException* lastUnwindException;
 
-		PREPARE_NEW_FRAME_FROM_NATIVE(methodInfo, args, ret);
+		PREPARE_NEW_FRAME_FROM_NATIVE(methodInfo, args, ret, 0);
 
 	LoopStart:
 		try
 		{
 			for (;;)
 			{
-				switch (*(HiOpcodeEnum*)ip)
+				HiOpcodeEnum opValue = *(HiOpcodeEnum*)ip;
+
+				uint16_t il_offset = *(uint16_t*)(ip + 2);
+				hybridclr::transform::g_exec_il_offset = il_offset;
+				ip += g_il_offset_size;
+
+				switch (opValue)
 				{
 #pragma region memory
 					//!!!{{MEMORY
@@ -4688,7 +4699,7 @@ else \
 				    std::memmove(_frameBasePtr + 1, (void*)(localVarBase + __argBase), __argStackObjectNum * sizeof(StackObject)); // move arg
 				    _frameBasePtr->obj = _newObj; // prepare this 
 				    (*(Il2CppObject**)(localVarBase + __obj)) = _newObj; // set must after move
-				    CALL_INTERP_VOID((ip + 16), __method, _frameBasePtr);
+				    CALL_INTERP_VOID((ip + 16), __method, _frameBasePtr, il_offset);
 				    continue;
 				}
 				case HiOpcodeEnum::NewClassInterpVar_Ctor_0:
@@ -4701,7 +4712,7 @@ else \
 				    StackObject* _frameBasePtr = (StackObject*)(void*)(localVarBase + __ctorFrameBase);
 				    _frameBasePtr->obj = _newObj; // prepare this 
 				    (*(Il2CppObject**)(localVarBase + __obj)) = _newObj;
-				    CALL_INTERP_VOID((ip + 16), __method, _frameBasePtr);
+				    CALL_INTERP_VOID((ip + 16), __method, _frameBasePtr, il_offset);
 				    continue;
 				}
 				case HiOpcodeEnum::NewValueTypeInterpVar:
@@ -4716,7 +4727,7 @@ else \
 				    std::memmove(_frameBasePtr + 1, (void*)(localVarBase + __argBase), __argStackObjectNum * sizeof(StackObject)); // move arg
 				    _frameBasePtr->ptr = (StackObject*)(void*)(localVarBase + __obj);
 				    int32_t _typeSize = GetTypeValueSize(__method->klass);
-				    CALL_INTERP_VOID((ip + 16), __method, _frameBasePtr);
+				    CALL_INTERP_VOID((ip + 16), __method, _frameBasePtr, il_offset);
 				    continue;
 				}
 				case HiOpcodeEnum::AdjustValueTypeRefVar:
@@ -4905,7 +4916,7 @@ else \
 					{
 						CHECK_NOT_NULL_THROW((localVarBase + __argBase)->obj);
 					}
-					CALL_INTERP_VOID((ip + 8), __methodInfo, (StackObject*)(void*)(localVarBase + __argBase));
+					CALL_INTERP_VOID((ip + 8), __methodInfo, (StackObject*)(void*)(localVarBase + __argBase), il_offset);
 				    continue;
 				}
 				case HiOpcodeEnum::CallInterp_ret:
@@ -4917,7 +4928,7 @@ else \
 					{
 						CHECK_NOT_NULL_THROW((localVarBase + __argBase)->obj);
 					}
-					CALL_INTERP_RET((ip + 16), __methodInfo, (StackObject*)(void*)(localVarBase + __argBase), (void*)(localVarBase + __ret));
+					CALL_INTERP_RET((ip + 16), __methodInfo, (StackObject*)(void*)(localVarBase + __argBase), (void*)(localVarBase + __ret), il_offset);
 				    continue;
 				}
 				case HiOpcodeEnum::CallVirtual_void:
@@ -4934,7 +4945,7 @@ else \
 				    }
 				    if (hybridclr::metadata::IsInterpreterImplement(_actualMethod))
 				    {
-				        CALL_INTERP_VOID((ip + 16), _actualMethod, _objPtr);
+				        CALL_INTERP_VOID((ip + 16), _actualMethod, _objPtr, il_offset);
 				    }
 				    else 
 				    {
@@ -4963,7 +4974,7 @@ else \
 				    }
 				    if (hybridclr::metadata::IsInterpreterImplement(_actualMethod))
 				    {
-				        CALL_INTERP_RET((ip + 16), _actualMethod, _objPtr, _ret);
+				        CALL_INTERP_RET((ip + 16), _actualMethod, _objPtr, _ret, il_offset);
 				    }
 				    else 
 				    {
@@ -4993,7 +5004,7 @@ else \
 				    }
 				    if (hybridclr::metadata::IsInterpreterImplement(_actualMethod))
 				    {
-				        CALL_INTERP_RET((ip + 24), _actualMethod, _objPtr, _ret);
+				        CALL_INTERP_RET((ip + 24), _actualMethod, _objPtr, _ret, il_offset);
 				    }
 				    else 
 				    {
@@ -5017,7 +5028,7 @@ else \
 				    {
 				        _argBasePtr->obj += 1;
 				    }
-				    CALL_INTERP_VOID((ip + 8), _actualMethod, _argBasePtr);
+				    CALL_INTERP_VOID((ip + 8), _actualMethod, _argBasePtr, il_offset);
 				    continue;
 				}
 				case HiOpcodeEnum::CallInterpVirtual_ret:
@@ -5031,7 +5042,7 @@ else \
 				    {
 				        _argBasePtr->obj += 1;
 				    }
-				    CALL_INTERP_RET((ip + 16), _actualMethod, _argBasePtr, (void*)(localVarBase + __ret));
+				    CALL_INTERP_RET((ip + 16), _actualMethod, _argBasePtr, (void*)(localVarBase + __ret), il_offset);
 				    continue;
 				}
 				case HiOpcodeEnum::CallInd_void:
@@ -5049,7 +5060,7 @@ else \
 					}
 					if (IsInterpreterImplement(_method))
 					{
-				        CALL_INTERP_VOID((ip + 16), _method, _argBasePtr);
+				        CALL_INTERP_VOID((ip + 16), _method, _argBasePtr, il_offset);
 				        continue;
 					}
 					if (!InitAndGetInterpreterDirectlyCallMethodPointer(_method))
@@ -5077,7 +5088,7 @@ else \
 					}
 					if (IsInterpreterImplement(_method))
 					{
-				        CALL_INTERP_RET((ip + 16), _method, _argBasePtr, _ret);
+				        CALL_INTERP_RET((ip + 16), _method, _argBasePtr, _ret, il_offset);
 				        continue;
 					}
 					if (!InitAndGetInterpreterDirectlyCallMethodPointer(_method))
@@ -5106,7 +5117,7 @@ else \
 					}
 					if (IsInterpreterImplement(_method))
 					{
-				        CALL_INTERP_RET((ip + 24), _method, _argBasePtr, _ret);
+				        CALL_INTERP_RET((ip + 24), _method, _argBasePtr, _ret, il_offset);
 				        continue;
 					}
 					if (!InitAndGetInterpreterDirectlyCallMethodPointer(_method))
@@ -5167,7 +5178,7 @@ else \
 								RaiseExecutionEngineException("CallInterpDelegate");
 							}
 							}
-							CALL_INTERP_RET((ip + 16), method, _argBasePtr, _ret);
+							CALL_INTERP_RET((ip + 16), method, _argBasePtr, _ret, il_offset);
 							continue;
 						}
 						else
@@ -5247,7 +5258,7 @@ else \
 								RaiseExecutionEngineException("CallInterpDelegate");
 							}
 							}
-							CALL_INTERP_RET((ip + 24), method, _argBasePtr, _ret);
+							CALL_INTERP_RET((ip + 24), method, _argBasePtr, _ret, il_offset);
 							continue;
 						}
 						else
@@ -5328,7 +5339,7 @@ else \
 								RaiseExecutionEngineException("CallInterpDelegate");
 							}
 							}
-							CALL_INTERP_RET((ip + 24), method, _argBasePtr, _ret);
+							CALL_INTERP_RET((ip + 24), method, _argBasePtr, _ret, il_offset);
 							continue;
 						}
 						else
@@ -11295,6 +11306,10 @@ else \
 		}
 		catch (Il2CppExceptionWrapper ex)
 		{
+			std::string errorMsg = il2cpp::utils::StringUtils::Utf16ToUtf8(ex.ex->message->chars, ex.ex->message->length);
+			UnityLogException(errorMsg + "\n" + hybridclr::StackTrace::GetFramesLog());
+			CLEANUP_NEW_STACK_FRAME();
+
 			PREPARE_EXCEPTION(ex.ex, 0);
 			FIND_NEXT_EX_HANDLER_OR_UNWIND();
 		}
