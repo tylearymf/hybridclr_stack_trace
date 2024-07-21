@@ -18,7 +18,13 @@
 
    在 Unity 场景中，先挂载 `IL2CppBridge` 脚本。该脚本负责给IL2Cpp提供接口调用
 
-2. **热更代码出现异常时**
+2. **注册热更的PDB数据到该脚本**
+
+   ```c#
+   IL2CppBridge.DebugInfo.RegisterPDB("HotUpdate", pdbBytes);
+   ```
+
+3. **热更代码出现异常时**
 
    当你在热更代码中出现异常时，你会看到两份异常日志：
 
